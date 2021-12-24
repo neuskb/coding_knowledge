@@ -1,0 +1,96 @@
+# 高性能编程
+[toc]
+
+## 高性能技术问题
+* 如何充分利用单个CPU资源
+* 如何高效调节多处理器任务分配
+* 如何提高输入输出速度
+* 如何在多任务间高效传递数据
+* 如何更高效利用内存
+* 如何确保计算与存储一致性
+* 如何利用专用硬件提升部门任务的计算性能
+
+
+## c++的编译器优化
+* 普通静态优化
+    * O1 一级优化
+    * O2 二级优化
+    * O3 三级优化
+* 指令集支持
+* 编译期特性支持
+这里主要介绍普通静态优化
+
+1. O1
+一级优化，在不影响编译速度的前提下，尽量采用一些优化算法降低代码大小，提升可执行代码的运行速度。比如合并常量计算，自动分支优化，内联函数优化（将只被调用一次的函数内联）等。
+
+2. O2
+会牺牲部门编译速度，除了执行-O1所执行的所有优化之外，还会采用几乎所有的目标配置支持的优化算法，用以提高目标代码的运行速度。
+
+3. O3
+除了执行-O2所有的优化选项之外，一般都是采取很多向量化算法，提高代码的并行执行程度，利用现在CPU中的流水线，cache等。
+
+## 核绑定
+CPU亲和性（CPU Affinity）， cpu亲和性指明了进程调度器能够把这个进程调度到哪些cpu上。
+
+核绑定的优势：
+* 增加进程内部cpu缓存的命中率
+
+cpu之间是不共享缓存的（L1/L2不共享，L3共享），如果进程频繁在各个cpu间进行切换，需要不断的使旧cpu的cache失效。
+
+* 增加线程间CPU缓存的命中率
+
+核绑定函数：
+```
+sched_setaffinity(pid_t pid, unsigned int cpusetsize, cpu_set_t *mask)
+```
+该函数设置进程为pid的这个进程，让它运行在mask所设定的CPU上。如果pid的值为0，则表示指定的是当前进程，使当前进程运行在mask所设定的那些CPU上。第二个参数cpusetsize是mask所指定的数的长度。通常设定为sizeof(cpu_set_t)。如果当前pid所指定的进程此时没有运行在mask所指定的任意一个CPU上，则该指定的进程会从其它CPU上迁移到mask的指定的一个CPU上运行。
+
+```
+sched_getaffinity(pid_t pid, unsigned int cpusetsize, cpu_set_t *mask)
+```
+该函数获得pid所指示的进程的CPU位掩码，并将该掩码返回到mask所指向的结构中。即获得指定pid当前可以运行在哪些CPU上。同样如果pid的值为0.也表示的是当前进程。
+
+
+也可以通过启动的时候taskset绑定：
+```
+taskset -c 0 ./test
+```
+
+这里都是指的绑定逻辑核。
+
+## 内存池
+实现类MemoryPool，可以采用单例模式：
+需要实现的接口：
+* 创建内存池
+* 销毁内存池
+* 分配内存块
+* 释放内存块
+内存池需要保证线程安全。
+
+## 无锁队列
+在c++11里有CAS的用法。
+```
+class atomic {
+bool compare_exchange_strong(T& expect /*用来比较的值*/, T desired/*用来设置的值*/)
+bool compare_exchange_weak(T& expect, T desired)
+}
+
+template< class T >
+bool atomic_compare_exchange_weak( std::atomic<T>* obj,
+                                   T* expected, T desired );
+template< class T >
+bool atomic_compare_exchange_weak( volatile std::atomic<T>* obj,
+                                   T* expected, T desired );
+```
+
+如何实现一个无锁队列？
+```
+
+```
+
+## 内存对齐
+C++11 新引入操作符alignof， 对齐描述符alignas，基本对齐值 alignof(std::max_align_t)
+alignas可以接受常量表达式和类型作为参数，可以修饰变量、类的数据成员等，不能修饰位域和用register申明的变量。一般往大对齐。
+
+内存对齐有利于增加访问效率，也有利于cpu cache命中，提升性能。
+
